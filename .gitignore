@@ -103,3 +103,9 @@ MoA_Bank V2 APi Key.txt
 ### 8. Git Tools ###
 bfg.jar
 ..bfg-report/
+
+# Local environment and account exports
+.env
+.env.*
+!*.env.example
+*계정*.txt
