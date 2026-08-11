@@ -6,6 +6,7 @@ import com.moa.service.community.CommunityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
+import com.moa.auth.SecurityUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,6 +30,7 @@ public class CommunityRestController {
     
     @PostMapping("/notice")
     public ResponseEntity<Void> addNotice(@RequestBody NoticeRequest request) {
+		request.setUserId(SecurityUtils.currentUserId());
         communityService.addNotice(request);
         return ResponseEntity.ok().build();
     }
@@ -37,6 +39,7 @@ public class CommunityRestController {
     public ResponseEntity<Void> updateNotice(
             @PathVariable Integer communityId,
             @RequestBody NoticeRequest request) {
+		request.setUserId(SecurityUtils.currentUserId());
         communityService.updateNotice(communityId, request);
         return ResponseEntity.ok().build();
     }
@@ -63,6 +66,7 @@ public class CommunityRestController {
     
     @PostMapping("/faq")
     public ResponseEntity<Void> addFaq(@RequestBody FaqRequest request) {
+		request.setUserId(SecurityUtils.currentUserId());
         communityService.addFaq(request);
         return ResponseEntity.ok().build();
     }
@@ -71,6 +75,7 @@ public class CommunityRestController {
     public ResponseEntity<Void> updateFaq(
             @PathVariable Integer communityId,
             @RequestBody FaqRequest request) {
+		request.setUserId(SecurityUtils.currentUserId());
         communityService.updateFaq(communityId, request);
         return ResponseEntity.ok().build();
     }
@@ -85,9 +90,9 @@ public class CommunityRestController {
     
     @GetMapping("/inquiry/my")
     public ResponseEntity<PageResponse<InquiryResponse>> getMyInquiryList(
-            @RequestParam String userId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
+		String userId = SecurityUtils.currentUserId();
         return ResponseEntity.ok(communityService.getMyInquiryList(userId, page, size));
     }
     
@@ -100,12 +105,15 @@ public class CommunityRestController {
     
     @GetMapping("/inquiry/{communityId}")
     public ResponseEntity<InquiryResponse> getInquiry(@PathVariable Integer communityId) {
-        return ResponseEntity.ok(communityService.getInquiry(communityId));
+		InquiryResponse inquiry = communityService.getInquiry(communityId);
+		SecurityUtils.requireOwnerOrAdmin(inquiry.getUserId());
+        return ResponseEntity.ok(inquiry);
        
     }
     
     @PostMapping("/inquiry")
     public ResponseEntity<Void> addInquiry(@ModelAttribute @Valid InquiryRequest request) {
+		request.setUserId(SecurityUtils.currentUserId());
         communityService.addInquiry(request);
         return ResponseEntity.ok().build();
     }

@@ -36,7 +36,10 @@ import com.moa.domain.OAuthAccount;
 import com.moa.service.auth.LoginHistoryService;
 import com.moa.service.oauth.OAuthAccountService;
 import com.moa.service.user.UserService;
+import com.moa.web.auth.AuthCookieWriter;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 
@@ -55,6 +58,7 @@ public class OAuthRestController {
 	private final LoginHistoryService loginHistoryService;
 	private final JwtProvider jwtProvider;
 	private final UserService userService;
+	private final AuthCookieWriter authCookieWriter;
 
 	@GetMapping("/kakao/auth")
 	public ApiResponse<?> kakaoAuth(@RequestParam(defaultValue = "login") String mode) {
@@ -145,7 +149,7 @@ public class OAuthRestController {
 		            .secure(true)
 		            .sameSite("None")
 		            .path("/")
-		            .maxAge(token.getAccessTokenExpiresIn())
+			    .maxAge(Math.max(0L, (token.getAccessTokenExpiresIn() - System.currentTimeMillis()) / 1000L))
 		            .build();
 
 		    ResponseCookie refreshCookie = ResponseCookie.from("REFRESH_TOKEN", token.getRefreshToken())
@@ -257,7 +261,7 @@ public class OAuthRestController {
 		                            .secure(true)
 		                            .sameSite("None")
 		                            .path("/")
-		                            .maxAge(jwt.getAccessTokenExpiresIn())
+			                            .maxAge(Math.max(0L, (jwt.getAccessTokenExpiresIn() - System.currentTimeMillis()) / 1000L))
 		                            .build()
 		                            .toString())
 		            .header(HttpHeaders.SET_COOKIE,
@@ -296,7 +300,8 @@ public class OAuthRestController {
 	}
 
 	@PostMapping("/connect-by-phone")
-	public ApiResponse<Map<String, Object>> connectByPhone(@RequestBody Map<String, String> body) {
+	public ApiResponse<Map<String, Object>> connectByPhone(@RequestBody Map<String, String> body,
+			HttpServletRequest request, HttpServletResponse response) {
 		String provider = body.get("provider");
 		String providerUserId = body.get("providerUserId");
 		String phone = body.get("phone");
@@ -323,6 +328,8 @@ public class OAuthRestController {
 		        new UsernamePasswordAuthenticationToken(user.getUserId(), null, List.of(() -> "ROLE_USER"));
 
 		var tokenResponse = jwtProvider.generateToken(authentication, provider);
+		authCookieWriter.add(request, response, tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
+				tokenResponse.getAccessTokenExpiresIn());
 
 		return ApiResponse.success(Map.of(
 		        "status", "LOGIN",
@@ -330,7 +337,6 @@ public class OAuthRestController {
 		        "provider", provider,
 		        "providerUserId", providerUserId,
 		        "accessToken", tokenResponse.getAccessToken(),
-		        "refreshToken", tokenResponse.getRefreshToken(),
 		        "accessTokenExpiresIn", tokenResponse.getAccessTokenExpiresIn()
 		));
 	}

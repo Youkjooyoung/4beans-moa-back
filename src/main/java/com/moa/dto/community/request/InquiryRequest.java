@@ -11,7 +11,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Setter
 public class InquiryRequest {
 
-    @NotBlank
     private String userId;
 
     @NotNull

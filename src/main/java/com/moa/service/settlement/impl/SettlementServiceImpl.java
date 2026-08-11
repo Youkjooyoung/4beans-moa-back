@@ -177,6 +177,13 @@ public class SettlementServiceImpl implements SettlementService {
 				.collect(Collectors.toList());
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public Settlement getSettlement(Integer settlementId) {
+		return settlementDao.findById(settlementId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.SETTLEMENT_NOT_FOUND));
+	}
+
 	private Settlement createPendingAccountSettlement(Integer partyId, Party party, String targetMonth) {
 		log.info("계좌 미등록으로 PENDING_ACCOUNT 정산 생성: partyId={}, targetMonth={}", partyId, targetMonth);
 

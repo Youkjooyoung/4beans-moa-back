@@ -1,9 +1,12 @@
-package com.moa.common.util;
+package com.moa.tools;
 
 import java.security.SecureRandom;
 import java.util.Base64;
 
-public class JwtSecretGenerator {
+public final class JwtSecretGenerator {
+
+	private JwtSecretGenerator() {
+	}
 
 	public static void main(String[] args) {
 		byte[] key = new byte[32];

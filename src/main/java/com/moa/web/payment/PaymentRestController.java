@@ -15,6 +15,7 @@ import com.moa.common.exception.ErrorCode;
 import com.moa.dto.payment.response.PaymentDetailResponse;
 import com.moa.dto.payment.response.PaymentResponse;
 import com.moa.service.payment.PaymentService;
+import com.moa.auth.SecurityUtils;
 
 /**
  * 결제 관리 REST API Controller
@@ -69,6 +70,7 @@ public class PaymentRestController {
     @GetMapping("/{paymentId}")
     public ApiResponse<PaymentDetailResponse> getPaymentDetail(@PathVariable Integer paymentId) {
         PaymentDetailResponse response = paymentService.getPaymentDetail(paymentId);
+		SecurityUtils.requireOwnerOrAdmin(response.getUserId());
         return ApiResponse.success(response);
     }
 
@@ -111,6 +113,10 @@ public class PaymentRestController {
     @GetMapping("/party/{partyId}")
     public ApiResponse<List<PaymentResponse>> getPartyPayments(@PathVariable Integer partyId) {
         List<PaymentResponse> response = paymentService.getPartyPayments(partyId);
+		if (!SecurityUtils.isAdmin()) {
+			String userId = SecurityUtils.currentUserId();
+			response = response.stream().filter(payment -> userId.equalsIgnoreCase(payment.getUserId())).toList();
+		}
         return ApiResponse.success(response);
     }
 }

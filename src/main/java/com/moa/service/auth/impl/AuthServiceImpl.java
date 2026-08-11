@@ -117,6 +117,7 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	public void logout(String accessToken, String refreshToken) {
+		jwtProvider.revoke(accessToken, refreshToken);
 	}
 
 	@Override

@@ -61,8 +61,7 @@ public class SecurityConfig {
 								"/api/auth/verify-email",
 								"/api/auth/unlock",
 								 "/api/auth/restore",
-								 "/api/auth/exists-by-email",
-								"/api/community/**")
+								 "/api/auth/exists-by-email")
 				.permitAll()
 				.requestMatchers(
 								"/api/oauth/kakao/callback",
@@ -85,24 +84,35 @@ public class SecurityConfig {
 								"/v3/api-docs/**",
 								"/uploads/**")
 						.permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/community/notice/**").permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/community/faq/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/push/subscribe").authenticated()
 						.requestMatchers(HttpMethod.POST, "/api/signup/pass/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/signup/pass/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/users/check-nickname").permitAll()
 						
-						.requestMatchers(HttpMethod.POST, "/api/community/notice/**").hasAuthority("ADMIN")
-						.requestMatchers(HttpMethod.PUT, "/api/community/notice/**").hasAuthority("ADMIN")
-						.requestMatchers(HttpMethod.POST, "/api/community/faq/**").hasAuthority("ADMIN")
-						.requestMatchers(HttpMethod.PUT, "/api/community/faq/**").hasAuthority("ADMIN")
-
-						.requestMatchers("/api/community/inquiry/**").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/community/notice/**", "/api/community/faq/**")
+								.hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.PUT, "/api/community/notice/**", "/api/community/faq/**")
+								.hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.DELETE, "/api/community/notice/**", "/api/community/faq/**")
+								.hasAuthority("ADMIN")
+						.requestMatchers("/api/community/inquiry/answer/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.GET, "/api/community/inquiry").hasAuthority("ADMIN")
+						.requestMatchers("/api/community/inquiry/**", "/api/community/inquiry").authenticated()
+						.requestMatchers(HttpMethod.GET, "/api/community/notice/**", "/api/community/faq/**")
+								.permitAll()
 						.requestMatchers("/api/admin/**").hasAuthority("ADMIN")
 						.requestMatchers("/api/push/admin/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.POST, "/api/push", "/api/push/multi", "/api/push/template")
+								.hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.GET, "/api/push/list").hasAuthority("ADMIN")
+
+						.requestMatchers(HttpMethod.POST, "/api/product/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.PUT, "/api/product/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.DELETE, "/api/product/**").hasAuthority("ADMIN")
 						
 						.requestMatchers(HttpMethod.GET, "/api/product/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/parties").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/parties/*/members").authenticated()
 						.requestMatchers(HttpMethod.GET, "/api/parties/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/subscriptions/products").permitAll()
 

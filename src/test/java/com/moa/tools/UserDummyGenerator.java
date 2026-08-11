@@ -1,4 +1,4 @@
-package com.moa.common.util;
+package com.moa.tools;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -6,20 +6,22 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
-public class UserDummyGenerator {
+import com.moa.common.util.EncryptUtil;
+
+public final class UserDummyGenerator {
 
 	private static final int USER_COUNT = 100;
 	private static final DateTimeFormatter F = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
 	private static final String[] DOMAINS = { "naver.com", "gmail.com", "daum.net", "nate.com" };
-
 	private static final String[] PROVIDERS = { "LOCAL", "KAKAO", "GOOGLE" };
-
 	private static final Random R = new Random();
+
+	private UserDummyGenerator() {
+	}
 
 	public static void main(String[] args) {
 		if (args.length < 1) {
-			System.err.println("Usage: java UserDummyGenerator <password>");
+			System.err.println("Usage: java com.moa.tools.UserDummyGenerator <password>");
 			System.exit(1);
 		}
 
@@ -38,17 +40,13 @@ public class UserDummyGenerator {
 		System.out.println(") VALUES");
 
 		for (int i = 1; i <= USER_COUNT; i++) {
-
 			String email = generateEmail(emails);
 			String phone = generatePhone(phones);
-			String nickname = "유저_" + randomString(6);
-			String ci = "CI_" + randomString(12);
-
+			String nickname = "test_user_" + randomString(6);
+			String ci = "TEST_CI_" + randomString(12);
 			String provider = PROVIDERS[R.nextInt(PROVIDERS.length)];
 			int agreeMarketing = R.nextBoolean() ? 1 : 0;
-
 			LocalDateTime reg = LocalDateTime.of(2024, 3, 1, 9, 0).plusDays(i).plusMinutes(R.nextInt(600));
-
 			LocalDateTime login = reg.plusDays(R.nextInt(200));
 
 			System.out.println("(");

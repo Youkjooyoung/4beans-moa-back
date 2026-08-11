@@ -12,6 +12,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.util.UUID;
+import java.util.Map;
+
+import com.moa.common.exception.BusinessException;
+import com.moa.common.exception.ErrorCode;
 
 @RestController
 @RequestMapping("/api/product")
@@ -73,17 +77,12 @@ public class ProductRestController {
     @PostMapping("/upload")
     public String uploadImage(@RequestParam("file") MultipartFile file) throws Exception {
         try {
-            if (file.isEmpty()) {
-                throw new RuntimeException("File is empty");
-            }
+            validateImageFile(file);
 
             String originalFilename = file.getOriginalFilename();
             logger.debug("Uploading file: {}", originalFilename);
 
-            String extension = "";
-            if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
+            String extension = extensionFor(file);
 
             String savedFilename = UUID.randomUUID().toString() + extension;
             // String fullPath = uploadDir + savedFilename;
@@ -122,6 +121,8 @@ public class ProductRestController {
             if (!hasLogo && !hasIcon) {
                 throw new RuntimeException("At least one file (logo or icon) is required");
             }
+			if (hasLogo) validateImageFile(logoFile);
+			if (hasIcon) validateImageFile(iconFile);
 
             // 기본 이름 생성 (UUID 기반)
             String baseName = UUID.randomUUID().toString().substring(0, 8);
@@ -129,7 +130,7 @@ public class ProductRestController {
 
             // 로고 파일 저장
             if (hasLogo) {
-                String logoExtension = getFileExtension(logoFile.getOriginalFilename());
+                String logoExtension = extensionFor(logoFile);
                 savedLogoFilename = baseName + "_logo" + logoExtension;
                 String logoFullPath = combinePath(uploadDir, savedLogoFilename);
 
@@ -143,7 +144,7 @@ public class ProductRestController {
 
             // 아이콘 파일 저장
             if (hasIcon) {
-                String iconExtension = getFileExtension(iconFile.getOriginalFilename());
+                String iconExtension = extensionFor(iconFile);
                 String iconFilename = baseName + "_icon" + iconExtension;
                 String iconFullPath = combinePath(uploadDir, iconFilename);
 
@@ -160,7 +161,7 @@ public class ProductRestController {
                 return combinePath(urlPrefix, savedLogoFilename);
             } else {
                 // 아이콘만 업로드한 경우 - 아이콘 URL 반환 (또는 빈 문자열)
-                String iconFilename = baseName + "_icon" + getFileExtension(iconFile != null ? iconFile.getOriginalFilename() : "");
+                String iconFilename = baseName + "_icon" + extensionFor(iconFile);
                 return combinePath(urlPrefix, iconFilename);
             }
         } catch (Exception e) {
@@ -169,12 +170,25 @@ public class ProductRestController {
         }
     }
 
-    private String getFileExtension(String filename) {
-        if (filename != null && filename.contains(".")) {
-            return filename.substring(filename.lastIndexOf("."));
-        }
-        return "";
-    }
+	private static final Map<String, String> IMAGE_EXTENSIONS = Map.of(
+			"image/png", ".png",
+			"image/jpeg", ".jpg",
+			"image/webp", ".webp",
+			"image/gif", ".gif");
+
+	private void validateImageFile(MultipartFile file) {
+		if (file == null || file.isEmpty()) {
+			throw new BusinessException(ErrorCode.FILE_EMPTY);
+		}
+		if (!IMAGE_EXTENSIONS.containsKey(file.getContentType())) {
+			throw new BusinessException(ErrorCode.BAD_REQUEST, "PNG, JPEG, WEBP, GIF 이미지만 업로드할 수 있습니다.");
+		}
+	}
+
+	private String extensionFor(MultipartFile file) {
+		validateImageFile(file);
+		return IMAGE_EXTENSIONS.get(file.getContentType());
+	}
 
     private void ensureDirectoryExists(File file) {
         if (!file.getParentFile().exists()) {
