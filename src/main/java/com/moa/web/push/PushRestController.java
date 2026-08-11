@@ -30,6 +30,7 @@ import com.moa.dto.push.response.PushCodeResponse;
 import com.moa.dto.push.response.PushResponse;
 import com.moa.service.push.PushService;
 import com.moa.service.push.PushSseService;
+import com.moa.auth.SecurityUtils;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,7 @@ public class PushRestController {
 	@GetMapping("/{pushId}")
 	public ResponseEntity<PushResponse> getPush(@PathVariable Integer pushId) {
 		PushResponse responseBody = pushService.getPush(pushId);
+		SecurityUtils.requireOwnerOrAdmin(responseBody.getReceiverId());
 		return ResponseEntity.ok(responseBody);
 	}
 
@@ -96,6 +98,7 @@ public class PushRestController {
 
 	@PatchMapping("/{pushId}/read")
 	public ResponseEntity<Map<String, Object>> updateRead(@PathVariable Integer pushId) {
+		requirePushOwner(pushId);
 		pushService.updateRead(pushId);
 		return ResponseEntity.ok(Map.of("success", true, "message", "읽음 처리되었습니다."));
 	}
@@ -108,6 +111,7 @@ public class PushRestController {
 
 	@DeleteMapping("/{pushId}")
 	public ResponseEntity<Map<String, Object>> deletePush(@PathVariable Integer pushId) {
+		requirePushOwner(pushId);
 		pushService.deletePush(pushId);
 		return ResponseEntity.ok(Map.of("success", true, "message", "삭제되었습니다."));
 	}
@@ -116,6 +120,11 @@ public class PushRestController {
 	public ResponseEntity<Map<String, Object>> deleteAllPushs(@AuthenticationPrincipal UserDetails userDetails) {
 		pushService.deleteAllPushs(userDetails.getUsername());
 		return ResponseEntity.ok(Map.of("success", true, "message", "전체 삭제되었습니다."));
+	}
+
+	private void requirePushOwner(Integer pushId) {
+		PushResponse push = pushService.getPush(pushId);
+		SecurityUtils.requireOwnerOrAdmin(push.getReceiverId());
 	}
 
 	@GetMapping("/admin/codes")

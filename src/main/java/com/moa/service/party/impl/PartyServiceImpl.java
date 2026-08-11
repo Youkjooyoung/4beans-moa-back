@@ -104,7 +104,6 @@ public class PartyServiceImpl implements PartyService {
 	}
 
 	@Override
-	@SuppressWarnings({"unchecked", "null"})
 	public PartyDetailResponse processLeaderDeposit(Integer partyId, String userId, PaymentRequest paymentRequest) {
 		Party party = partyDao.findById(partyId).orElseThrow(() -> new BusinessException(ErrorCode.PARTY_NOT_FOUND));
 
@@ -135,14 +134,14 @@ public class PartyServiceImpl implements PartyService {
 			// authKey가 있으면 새 빌링키 발급
 			if (paymentRequest.getAuthKey() != null && !paymentRequest.getAuthKey().isEmpty()) {
 				Map<String, Object> billingData = tossPaymentService.issueBillingKey(paymentRequest.getAuthKey(), userId);
-				billingKey = (String) billingData.get("billingKey");
-				Map<String, Object> cardInfo = (Map<String, Object>) billingData.get("card");
+				billingKey = requireString(billingData, "billingKey", "billing key response");
+				Map<?, ?> cardInfo = requireMap(billingData, "card", "billing key response");
 
 				UserCard newUserCard = UserCard.builder()
 						.userId(userId)
 						.billingKey(billingKey)
-						.cardCompany((String) cardInfo.get("company"))
-						.cardNumber((String) cardInfo.get("number"))
+						.cardCompany(requireString(cardInfo, "company", "card response"))
+						.cardNumber(requireString(cardInfo, "number", "card response"))
 						.regDate(LocalDateTime.now())
 						.build();
 				userCardDao.findByUserId(userId).ifPresentOrElse(
@@ -290,9 +289,9 @@ public class PartyServiceImpl implements PartyService {
 		if (paymentRequest.getAuthKey() != null && !paymentRequest.getAuthKey().isEmpty()) {
 			// Case A: 새 카드 등록 (authKey로 빌링키 발급 및 저장/업데이트)
 			Map<String, Object> billingKeyIssueResponse = tossPaymentService.issueBillingKey(paymentRequest.getAuthKey(), userId);
-			billingKey = (String) billingKeyIssueResponse.get("billingKey");
-			Map<String, Object> cardInfo = (Map<String, Object>) billingKeyIssueResponse.get("card");
-			cardCompany = (String) cardInfo.get("company");
+			billingKey = requireString(billingKeyIssueResponse, "billingKey", "billing key response");
+			Map<?, ?> cardInfo = requireMap(billingKeyIssueResponse, "card", "billing key response");
+			cardCompany = requireString(cardInfo, "company", "card response");
 			cardNumber = (String) cardInfo.get("number"); // 카드 마지막 4자리
 
 			UserCard newOrUpdatedCard = UserCard.builder()
@@ -493,6 +492,22 @@ public class PartyServiceImpl implements PartyService {
 	}
 
 	// ========== ⭐ Private Push 메서드 ==========
+
+	private Map<?, ?> requireMap(Map<?, ?> source, String key, String context) {
+		Object value = source.get(key);
+		if (value instanceof Map<?, ?> map) {
+			return map;
+		}
+		throw new BusinessException(ErrorCode.INVALID_PAYMENT_REQUEST, context + " is missing " + key);
+	}
+
+	private String requireString(Map<?, ?> source, String key, String context) {
+		Object value = source.get(key);
+		if (value instanceof String text && !text.isBlank()) {
+			return text;
+		}
+		throw new BusinessException(ErrorCode.INVALID_PAYMENT_REQUEST, context + " is missing " + key);
+	}
 
 	private void safeSendPush(Runnable pushAction) {
 		try {

@@ -88,6 +88,8 @@ src/main/resources/keystore/
 
 ### 6. API-Key Secret ###
 application-secret.properties
+application-local.properties
+src/main/resources/application-local.properties
 *API Key*.txt
 *Api Key*.txt
 *APi Key*.txt

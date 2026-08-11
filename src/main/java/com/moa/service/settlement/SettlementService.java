@@ -46,4 +46,6 @@ public interface SettlementService {
      * @return 정산 상세 목록 (포함된 결제 내역)
      */
     List<SettlementDetailResponse> getSettlementDetails(Integer settlementId);
+
+    Settlement getSettlement(Integer settlementId);
 }

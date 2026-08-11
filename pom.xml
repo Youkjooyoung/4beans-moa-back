@@ -23,6 +23,7 @@
 
 	<properties>
 		<java.version>17</java.version>
+		<mockito.version>5.17.0</mockito.version>
 	</properties>
 
 	<dependencies>
@@ -95,6 +96,7 @@
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
+			<version>${mockito.version}</version>
 			<scope>test</scope>
 		</dependency>
 
@@ -206,6 +208,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
 					<useModulePath>false</useModulePath>
+					<argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
 
 					<!-- 테스트 실행 (skipTests=false로 변경) -->
 					<skipTests>false</skipTests>

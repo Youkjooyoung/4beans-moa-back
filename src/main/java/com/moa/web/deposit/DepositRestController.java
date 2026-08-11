@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.moa.common.exception.ApiResponse;
 import com.moa.dto.deposit.response.DepositResponse;
 import com.moa.service.deposit.DepositService;
+import com.moa.auth.SecurityUtils;
 
 /**
  * 보증금 관리 REST API Controller
@@ -65,6 +66,7 @@ public class DepositRestController {
     @GetMapping("/{depositId}")
     public ApiResponse<DepositResponse> getDepositDetail(@PathVariable Integer depositId) {
         DepositResponse response = depositService.getDepositDetail(depositId);
+		SecurityUtils.requireOwnerOrAdmin(response.getUserId());
         return ApiResponse.success(response);
     }
 
@@ -108,6 +110,10 @@ public class DepositRestController {
     @GetMapping("/party/{partyId}")
     public ApiResponse<List<DepositResponse>> getPartyDeposits(@PathVariable Integer partyId) {
         List<DepositResponse> response = depositService.getPartyDeposits(partyId);
+		if (!SecurityUtils.isAdmin()) {
+			String userId = SecurityUtils.currentUserId();
+			response = response.stream().filter(deposit -> userId.equalsIgnoreCase(deposit.getUserId())).toList();
+		}
         return ApiResponse.success(response);
     }
 }

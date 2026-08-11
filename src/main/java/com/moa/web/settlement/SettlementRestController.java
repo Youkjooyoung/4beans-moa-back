@@ -15,6 +15,8 @@ import com.moa.common.exception.ErrorCode;
 import com.moa.dto.settlement.response.SettlementDetailResponse;
 import com.moa.dto.settlement.response.SettlementResponse;
 import com.moa.service.settlement.SettlementService;
+import com.moa.auth.SecurityUtils;
+import com.moa.domain.Settlement;
 
 /**
  * 정산 관리 REST API Controller
@@ -92,6 +94,8 @@ public class SettlementRestController {
     @GetMapping("/{settlementId}/details")
     public ApiResponse<List<SettlementDetailResponse>> getSettlementDetails(
             @PathVariable Integer settlementId) {
+		Settlement settlement = settlementService.getSettlement(settlementId);
+		SecurityUtils.requireOwnerOrAdmin(settlement.getPartyLeaderId());
         List<SettlementDetailResponse> response = settlementService.getSettlementDetails(settlementId);
         return ApiResponse.success(response);
     }

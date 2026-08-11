@@ -17,7 +17,10 @@ import com.moa.dto.user.request.UserCreateRequest;
 import com.moa.dto.user.response.CommonCheckResponse;
 import com.moa.service.passauth.PassAuthService;
 import com.moa.service.user.UserService;
+import com.moa.web.auth.AuthCookieWriter;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +31,7 @@ public class SignupRestController {
 
 	private final UserService userService;
 	private final PassAuthService passAuthService;
+	private final AuthCookieWriter authCookieWriter;
 
 	@PostMapping("/check")
 	public ApiResponse<CommonCheckResponse> check(@RequestBody CommonCheckRequest request) {
@@ -36,13 +40,18 @@ public class SignupRestController {
 
 
 	@PostMapping("/add")
-	public ApiResponse<?> add(@RequestBody @Valid UserCreateRequest request) {
+	public ApiResponse<?> add(@RequestBody @Valid UserCreateRequest request, HttpServletRequest httpRequest,
+			HttpServletResponse httpResponse) {
 
 		boolean isSocial = request.getProvider() != null && !request.getProvider().isBlank()
 				&& request.getProviderUserId() != null && !request.getProviderUserId().isBlank();
 
 		if (isSocial) {
-			return ApiResponse.success(userService.addUserAndLogin(request));
+			Map<String, Object> result = userService.addUserAndLogin(request);
+			authCookieWriter.add(httpRequest, httpResponse, (String) result.get("accessToken"),
+					(String) result.get("refreshToken"), (Long) result.get("accessTokenExpiresIn"));
+			return ApiResponse.success(Map.of("signupType", result.get("signupType"), "user", result.get("user"),
+					"accessToken", result.get("accessToken"), "accessTokenExpiresIn", result.get("accessTokenExpiresIn")));
 		}
 
 		return ApiResponse.success(Map.of("signupType", "NORMAL", "user", userService.addUser(request)));

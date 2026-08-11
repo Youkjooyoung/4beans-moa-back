@@ -12,6 +12,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -56,6 +57,7 @@ public class AuthRestController {
 	private final UserService userService;
 	private final LoginHistoryService loginHistoryService;
 	private final BackupCodeService backupCodeService;
+	private final AuthCookieWriter authCookieWriter;
 
 	@PostMapping("/login")
 	public ApiResponse<LoginResponse> login(@RequestBody @Valid LoginRequest request, HttpServletRequest httpRequest,
@@ -77,18 +79,11 @@ public class AuthRestController {
 			}
 
 			if (!response.isOtpRequired()) {
-				ResponseCookie accessCookie = ResponseCookie.from("ACCESS_TOKEN", response.getAccessToken())
-						.httpOnly(true).secure(true).sameSite("None").path("/")
-						.maxAge(response.getAccessTokenExpiresIn()).build();
-
-				ResponseCookie refreshCookie = ResponseCookie.from("REFRESH_TOKEN", response.getRefreshToken())
-						.httpOnly(true).secure(true).sameSite("None").path("/").maxAge(60 * 60 * 24 * 14).build();
-
-				httpResponse.addHeader("Set-Cookie", accessCookie.toString());
-				httpResponse.addHeader("Set-Cookie", refreshCookie.toString());
+				authCookieWriter.add(httpRequest, httpResponse, response.getAccessToken(), response.getRefreshToken(),
+						response.getAccessTokenExpiresIn());
 			}
 
-			return ApiResponse.success(response);
+			return ApiResponse.success(isAndroidClient(httpRequest) ? response : withoutRefreshToken(response));
 
 		} catch (BusinessException e) {
 			throw e;
@@ -97,7 +92,7 @@ public class AuthRestController {
 
 	@PostMapping("/login/otp-verify")
 	public ApiResponse<TokenResponse> verifyLoginOtp(@RequestBody @Valid OtpLoginVerifyRequest request,
-			HttpServletRequest httpRequest) {
+			HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
 
 		String clientIp = extractClientIp(httpRequest);
 		String userAgent = httpRequest.getHeader("User-Agent");
@@ -109,20 +104,36 @@ public class AuthRestController {
 
 		TokenResponse tokenResponse = authService.verifyLoginOtp(request);
 		loginHistoryService.recordSuccess(userId, loginType, clientIp, userAgent);
+		authCookieWriter.add(httpRequest, httpResponse, tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
+				tokenResponse.getAccessTokenExpiresIn());
 
-		return ApiResponse.success(tokenResponse);
+		return ApiResponse.success(isAndroidClient(httpRequest) ? tokenResponse : withoutRefreshToken(tokenResponse));
 	}
 
 	@PostMapping("/refresh")
-	public ApiResponse<TokenResponse> refresh(@RequestHeader("Refresh-Token") String refreshToken) {
-		return ApiResponse.success(authService.refresh(refreshToken));
+	public ApiResponse<TokenResponse> refresh(
+			@RequestHeader(value = "Refresh-Token", required = false) String refreshTokenHeader,
+			@CookieValue(value = "REFRESH_TOKEN", required = false) String refreshTokenCookie,
+			HttpServletRequest request, HttpServletResponse response) {
+		String refreshToken = firstNonBlank(refreshTokenHeader, refreshTokenCookie);
+		if (refreshToken == null) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED, "리프레시 토큰이 필요합니다.");
+		}
+		TokenResponse tokenResponse = authService.refresh(refreshToken);
+		authCookieWriter.add(request, response, tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
+				tokenResponse.getAccessTokenExpiresIn());
+		return ApiResponse.success(isAndroidClient(request) ? tokenResponse : withoutRefreshToken(tokenResponse));
 	}
 
 	@PostMapping("/logout")
 	public ApiResponse<Void> logout(@RequestHeader(value = "Authorization", required = false) String accessToken,
-			@RequestHeader(value = "Refresh-Token", required = false) String refreshToken, HttpServletRequest request,
+			@RequestHeader(value = "Refresh-Token", required = false) String refreshTokenHeader,
+			@CookieValue(value = "ACCESS_TOKEN", required = false) String accessTokenCookie,
+			@CookieValue(value = "REFRESH_TOKEN", required = false) String refreshTokenCookie,
+			HttpServletRequest request,
 			HttpServletResponse response) {
-		authService.logout(accessToken, refreshToken);
+		authService.logout(firstNonBlank(accessToken, accessTokenCookie),
+				firstNonBlank(refreshTokenHeader, refreshTokenCookie));
 
 		boolean isHttps = "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")) || request.isSecure();
 
@@ -136,6 +147,13 @@ public class AuthRestController {
 		response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
 
 		return ApiResponse.success(null);
+	}
+
+	private String firstNonBlank(String primary, String fallback) {
+		if (primary != null && !primary.isBlank()) {
+			return primary;
+		}
+		return fallback != null && !fallback.isBlank() ? fallback : null;
 	}
 
 	@PostMapping("/verify-email")
@@ -177,12 +195,14 @@ public class AuthRestController {
 
 	@PostMapping("/login/backup-verify")
 	public ApiResponse<TokenResponse> verifyLoginBackup(@RequestBody @Valid BackupCodeLoginRequest request,
-			HttpServletRequest httpRequest) {
+			HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
 		String clientIp = extractClientIp(httpRequest);
 		String userAgent = httpRequest.getHeader("User-Agent");
 		String loginType = "OTP_BACKUP";
 
 		TokenResponse tokenResponse = authService.verifyLoginBackupCode(request);
+		authCookieWriter.add(httpRequest, httpResponse, tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
+				tokenResponse.getAccessTokenExpiresIn());
 
 		String userId = request.getUserId();
 		if (userId == null || userId.isBlank()) {
@@ -195,7 +215,7 @@ public class AuthRestController {
 			loginHistoryService.recordSuccess(userId, loginType, clientIp, userAgent);
 		}
 
-		return ApiResponse.success(tokenResponse);
+		return ApiResponse.success(isAndroidClient(httpRequest) ? tokenResponse : withoutRefreshToken(tokenResponse));
 	}
 
 	@GetMapping("/otp/backup/list")
@@ -321,25 +341,33 @@ public class AuthRestController {
 
 		TokenResponse token = authService.issueToken(userId);
 
-		boolean isHttps = "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))
-				|| httpRequest.isSecure();
-
-		ResponseCookie accessCookie = ResponseCookie.from("ACCESS_TOKEN", token.getAccessToken()).httpOnly(true)
-				.secure(isHttps).sameSite(isHttps ? "None" : "Lax").path("/").maxAge(token.getAccessTokenExpiresIn())
-				.build();
-
-		ResponseCookie refreshCookie = ResponseCookie.from("REFRESH_TOKEN", token.getRefreshToken()).httpOnly(true)
-				.secure(isHttps).sameSite(isHttps ? "None" : "Lax").path("/").maxAge(60 * 60 * 24 * 14).build();
-
-		httpResponse.addHeader("Set-Cookie", accessCookie.toString());
-		httpResponse.addHeader("Set-Cookie", refreshCookie.toString());
+		authCookieWriter.add(httpRequest, httpResponse, token.getAccessToken(), token.getRefreshToken(),
+				token.getAccessTokenExpiresIn());
 
 		String clientIp = extractClientIp(httpRequest);
 		String userAgent = httpRequest.getHeader("User-Agent");
 		loginHistoryService.recordSuccess(userId, "RESTORE", clientIp, userAgent);
 
+		if (isAndroidClient(httpRequest)) {
+			return ApiResponse.success(Map.of("restored", true, "userId", userId, "accessToken", token.getAccessToken(),
+					"refreshToken", token.getRefreshToken(), "accessTokenExpiresIn", token.getAccessTokenExpiresIn()));
+		}
 		return ApiResponse.success(Map.of("restored", true, "userId", userId, "accessToken", token.getAccessToken(),
-				"refreshToken", token.getRefreshToken(), "accessTokenExpiresIn", token.getAccessTokenExpiresIn()));
+				"accessTokenExpiresIn", token.getAccessTokenExpiresIn()));
+	}
+
+	private boolean isAndroidClient(HttpServletRequest request) {
+		return "ANDROID".equalsIgnoreCase(request.getHeader("X-Client-Type"));
+	}
+
+	private LoginResponse withoutRefreshToken(LoginResponse response) {
+		response.setRefreshToken(null);
+		return response;
+	}
+
+	private TokenResponse withoutRefreshToken(TokenResponse response) {
+		return TokenResponse.builder().grantType(response.getGrantType()).accessToken(response.getAccessToken())
+				.accessTokenExpiresIn(response.getAccessTokenExpiresIn()).build();
 	}
 
 }

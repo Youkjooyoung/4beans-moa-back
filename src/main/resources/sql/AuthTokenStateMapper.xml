@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moa.dao.auth.AuthTokenStateDao">
+    <insert id="insertRefreshToken">
+        INSERT INTO AUTH_TOKEN_STATE (TOKEN_HASH, USER_ID, TOKEN_TYPE, EXPIRES_AT, CREATED_AT)
+        VALUES (#{tokenHash}, #{userId}, 'REFRESH', #{expiresAt}, CURRENT_TIMESTAMP)
+    </insert>
+    <update id="revokeActiveRefreshToken">
+        UPDATE AUTH_TOKEN_STATE SET REVOKED_AT = CURRENT_TIMESTAMP
+        WHERE TOKEN_HASH = #{tokenHash} AND TOKEN_TYPE = 'REFRESH'
+          AND REVOKED_AT IS NULL AND EXPIRES_AT &gt; CURRENT_TIMESTAMP
+    </update>
+    <select id="isActiveRefreshToken" resultType="int">
+        SELECT COUNT(1) FROM AUTH_TOKEN_STATE
+        WHERE TOKEN_HASH = #{tokenHash} AND TOKEN_TYPE = 'REFRESH'
+          AND REVOKED_AT IS NULL AND EXPIRES_AT &gt; CURRENT_TIMESTAMP
+    </select>
+    <insert id="insertRevokedAccessToken">
+        INSERT INTO AUTH_TOKEN_STATE (TOKEN_HASH, USER_ID, TOKEN_TYPE, EXPIRES_AT, REVOKED_AT, CREATED_AT)
+        VALUES (#{tokenHash}, #{userId}, 'ACCESS', #{expiresAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON DUPLICATE KEY UPDATE REVOKED_AT = CURRENT_TIMESTAMP
+    </insert>
+    <select id="isAccessTokenRevoked" resultType="int">
+        SELECT COUNT(1) FROM AUTH_TOKEN_STATE
+        WHERE TOKEN_HASH = #{tokenHash} AND TOKEN_TYPE = 'ACCESS'
+          AND REVOKED_AT IS NOT NULL AND EXPIRES_AT &gt; CURRENT_TIMESTAMP
+    </select>
+    <delete id="deleteExpiredTokens">
+        DELETE FROM AUTH_TOKEN_STATE WHERE EXPIRES_AT &lt;= CURRENT_TIMESTAMP
+    </delete>
+</mapper>
+
