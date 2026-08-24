@@ -50,6 +50,11 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void healthEndpointRemainsPublic() throws Exception {
+        mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    }
+
+    @Test
     @WithMockUser(authorities = "USER")
     void normalUserCannotWriteNoticeProductOrPush() throws Exception {
         mockMvc.perform(post("/api/community/notice")).andExpect(status().isForbidden());
@@ -80,6 +85,9 @@ class SecurityConfigAuthorizationTest {
     static class TestEndpoints {
         @GetMapping("/api/community/notice")
         void notice() {}
+
+        @GetMapping("/actuator/health")
+        void health() {}
 
         @PostMapping("/api/community/notice")
         void createNotice() {}
